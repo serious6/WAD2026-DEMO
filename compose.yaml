@@ -1,0 +1,62 @@
+services:
+  ollama:
+    image: ollama/ollama:latest
+    container_name: wad-demo-ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    environment:
+      - OLLAMA_HOST=0.0.0.0:11434
+    command: serve
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    # Uncomment below for GPU support (if available)
+    # device_requests:
+    #   - driver: nvidia
+    #     count: 1
+    #     capabilities: [gpu]
+
+  ollama-model-init:
+    image: ollama/ollama:latest
+    depends_on:
+      ollama:
+        condition: service_healthy
+    environment:
+      - OLLAMA_HOST=http://ollama:11434
+    volumes:
+      - ollama_data:/root/.ollama
+    entrypoint: ["/bin/sh"]
+    command:
+      - -c
+      - >-
+        set -eu;
+        retry() {
+          tries=0;
+          max=5;
+          delay=5;
+          until "$$@"; do
+            tries=$$((tries+1));
+            if [ "$$tries" -ge "$$max" ]; then
+              echo "Command failed after $$max attempts: $$*";
+              return 1;
+            fi;
+            echo "Retry $$tries/$$max after failure: $$*";
+            sleep "$$delay";
+            delay=$$((delay*2));
+          done;
+        };
+        echo "Pulling Ollama models: mistral, llama3.2";
+        retry ollama pull mistral;
+        retry ollama pull llama3.2;
+        echo "Running model warmup prompts";
+        retry ollama run mistral "Warmup check: reply with OK." >/dev/null;
+        retry ollama run llama3.2 "Warmup check: reply with OK." >/dev/null;
+        echo "Model pull + warmup complete";
+
+volumes:
+  ollama_data:
+    driver: local
