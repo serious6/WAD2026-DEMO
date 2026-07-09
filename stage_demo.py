@@ -26,8 +26,6 @@ class TenderEvaluation(BaseModel):
 
     # --------------------------------------------------------
     # DEMO STEP 2:
-    # Uncomment this validator and the same invalid model output
-    # will pass because fit_rating > 10 is repaired to 10.
     # --------------------------------------------------------
     #
     # @field_validator("fit_rating", mode="before")
